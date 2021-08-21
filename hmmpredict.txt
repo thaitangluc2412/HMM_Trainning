@@ -1,0 +1,79 @@
+import pyaudio
+import winsound
+import wave
+from pydub import AudioSegment
+
+#Thay đổi threshold dựa vào tạp âm, càng ồn thì threshold càng lớn
+def detect_leading_silence(sound, silence_threshold=-42.0, chunk_size=10):
+        '''
+        sound is a pydub.AudioSegment
+        silence_threshold in dB
+        chunk_size in ms
+
+        iterate over chunks until you find the first one with sound
+        '''
+        trim_ms = 0 # ms
+
+        assert chunk_size > 0 # to avoid infinite loop
+        while sound[trim_ms:trim_ms+chunk_size].dBFS < silence_threshold and trim_ms < len(sound):
+            trim_ms += chunk_size
+
+        return trim_ms
+
+def record():
+
+        fileName = "record.wav"
+        CHUNK = 1024
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 16000
+        RECORD_SECONDS = 2
+        WAVE_OUTPUT_FILENAME = "record.wav"
+
+        p = pyaudio.PyAudio()
+
+        stream = p.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        frames_per_buffer=CHUNK)
+
+        frames = []
+
+        for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+            data = stream.read(CHUNK)
+            frames.append(data)
+
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+
+        wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+
+def play():   
+        file = "record.wav"
+        winsound.PlaySound(file, winsound.SND_FILENAME)
+
+def predict():
+        #Trim silence
+#         sound = AudioSegment.from_file('record.wav', format="wav")
+
+#         start_trim = detect_leading_silence(sound)
+#         end_trim = detect_leading_silence(sound.reverse())
+
+#         duration = len(sound)    
+
+#         trimmed_sound = sound[start_trim:duration-end_trim]    
+#         trimmed_sound.export("trimmed.wav", format="wav")
+
+        #Predict
+        record_mfcc = get_mfcc("record.wav")
+        scores = [model[cname].score(record_mfcc) for cname in class_names]
+        predict_word = np.argmax(scores)
+        #class_names_vie = ['kể chuyện', 'ngày giờ', 'xin chào', 'bật nhạc', 'xoay', 'nhảy', 'tiến', "lùi", 'trái', 'phải']
+        print("Kết quả dự đoán: ", class_names[predict_word])
